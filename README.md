@@ -1,7 +1,8 @@
 # Single-cell mapping of GLP-1 and GIP receptor expression in the dosal vagal complex
 
-##Methods
-**Data integration** \n
+Methods
+
+**Data integration**\
 The single-cell atlases by Zhang et al. and Ludwig et al. were integrated using Seurat (Stuart et al., Cell 2019) version 4.0.1. We generated a combined atlas by integrating all cells in the two data sets and subsequently integrating neurons only using the same procedure. The count matrices from Zhang et al. were downloaded from https://github.com/jakaye/AP_scRNA and normalized using the function ‘NormalizeData’. The top variable genes were detected using ‘FindVariableFeatures’. Preprocessed data from Ludwig et al. were obtained from in-house. The atlases from Zhang et al. and Ludwig et al. were aligned applying the functions ‘SelectIntegrationFeatures’, ‘FindIntegrationAnchors’, and ‘IntegrateData’ which use canonical correlation analysis followed by mutual nearest neighbor detection.
  
 To assign cell type and neuronal populations labels, the two integrated atlases (all cells and neurons only) were clustered using ‘FindNeighbors’ and ‘FindClusters’ at a granularity that separated the different glial cell types and neuronal populations characterized by Ludwig et al. The clusters were annotated with the nomenclature from Ludwig et al. with the exception that Glu4 neurons were split into three clusters (Glu4a-c) as was done by Zhang et al.
