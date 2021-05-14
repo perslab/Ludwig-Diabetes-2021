@@ -25,7 +25,7 @@ ludwig.neurons$cell.subtype2 <- neuron.type.info$cell.type2[match(ludwig.neurons
 ludwig.neurons$cell.subtype2 <- factor(ludwig.neurons$cell.subtype2, 
                                       levels = neuron.type.info$cell.type2)
 
-# Zhang et al scRNA-seq Seurat objects
+# Zhang et al snRNA-seq Seurat objects
 # All cells
 zhang.cells <- readRDS("/projects/mludwig/Ludwig-Diabetes-2021/data/Zhang/AP_Seurat_obj.rds")
 
@@ -48,7 +48,7 @@ zhang.neurons$cell.subtype[which(zhang.neurons$SCT_snn_res.1.1 == 8)] <- "9_NTS"
 zhang.neurons$cell.subtype[which(zhang.neurons$SCT_snn_res.1.1 == 9)] <- "4_AP"
 ```
 
-# Data integration all cells
+# Data integration - all cells
 ```{r, message=FALSE}
 # Data preprocessing
 DefaultAssay(ludwig.cells) <- "integrated"
@@ -70,7 +70,7 @@ cells.anchors <- FindIntegrationAnchors(object.list = cells.list,
                                           anchor.features = features)
 cells.integrated <- IntegrateData(anchorset = cells.anchors)
 
-#  Scaling and dimensionality reduction
+# Scaling and dimensionality reduction
 cells.integrated <- ScaleData(object = cells.integrated, verbose = F) 
 cells.integrated <- RunPCA(object = cells.integrated, npcs = 30, verbose = F)
 cells.integrated <- RunUMAP(object = cells.integrated, reduction = "pca", 
@@ -107,7 +107,7 @@ DimPlot(cells.integrated, reduction = "umap", label = T, group.by = "cell.type2"
   xlab("UMAP 1") + ylab("UMAP 2")
 ```
 
-# Data integration neurons
+# Data integration - neurons
 ```{r, message=FALSE}
 # Data preprocessing
 DefaultAssay(ludwig.neurons) <- "integrated"
@@ -153,7 +153,6 @@ DimPlot(neurons.integrated, reduction = "umap", label = T, group.by = "integrate
 
 ```{r}
 # Assign labels based on the classifications from Ludwig et al. with the exception that the Glu4 population is split into three subpopulations
-
 neurons.integrated$neuronal.subtype2 <- "remove"
 
 # Cholinergic neurons
