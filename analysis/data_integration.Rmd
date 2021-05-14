@@ -1,0 +1,211 @@
+---
+title: "data_integration"
+output: html_notebook
+---
+
+```{r}
+library(Seurat)
+library(ggplot2)
+library(data.table)
+library(doMC)
+registerDoMC(20)
+```
+
+# Load data
+```{r}
+# Ludwig et al snRNA-seq Seurat objects
+# All cells
+ludwig.cells <- readRDS("/projects/mludwig/Ludwig-2021/output/Seurat_objects/AP_Seurat_obj.rds")
+
+# Neurons 
+ludwig.neurons <- readRDS("/projects/mludwig/Ludwig-2021/output/Seurat_objects/neurons_Seurat_obj.rds")
+neuron.type.info <- readRDS("/projects/mludwig/Ludwig-2021/output/AUCell/neuron_type_info.rds")
+ludwig.neurons$cell.subtype2 <- neuron.type.info$cell.type2[match(ludwig.neurons$cell.subtype,
+                                                           neuron.type.info$cell.type)]
+ludwig.neurons$cell.subtype2 <- factor(ludwig.neurons$cell.subtype2, 
+                                      levels = neuron.type.info$cell.type2)
+
+# Zhang et al scRNA-seq Seurat objects
+# All cells
+zhang.cells <- readRDS("/projects/mludwig/Ludwig-Diabetes-2021/data/Zhang/AP_Seurat_obj.rds")
+
+# Neurons
+zhang.neurons <- readRDS("/projects/mludwig/Ludwig-Diabetes-2021/data/Zhang/AP_neurons_Seurat_obj.rds")
+zhang.neurons.no.NTS <- readRDS("/projects/mludwig/Ludwig-Diabetes-2021/data/Zhang/AP_neurons_no_NTS_Seurat_obj.rds")
+zhang.neurons$origin <- "NTS"
+zhang.neurons$origin[match(colnames(zhang.neurons.no.NTS), colnames(zhang.neurons))] <- zhang.neurons.no.NTS$seurat_clusters
+
+zhang.neurons$cell.subtype <- ""
+zhang.neurons$cell.subtype[which(zhang.neurons$SCT_snn_res.1.1 == 0)] <- "5_AP"
+zhang.neurons$cell.subtype[which(zhang.neurons$SCT_snn_res.1.1 == 1)] <- "1_AP"
+zhang.neurons$cell.subtype[which(zhang.neurons$SCT_snn_res.1.1 == 2)] <- "10_NTS"
+zhang.neurons$cell.subtype[which(zhang.neurons$SCT_snn_res.1.1 == 3)] <- "6_AP"
+zhang.neurons$cell.subtype[which(zhang.neurons$SCT_snn_res.1.1 == 4)] <- "2_AP"
+zhang.neurons$cell.subtype[which(zhang.neurons$SCT_snn_res.1.1 == 5)] <- "8_NTS"
+zhang.neurons$cell.subtype[which(zhang.neurons$SCT_snn_res.1.1 == 6)] <- "3_AP"
+zhang.neurons$cell.subtype[which(zhang.neurons$SCT_snn_res.1.1 == 7)] <- "7_AP"
+zhang.neurons$cell.subtype[which(zhang.neurons$SCT_snn_res.1.1 == 8)] <- "9_NTS"
+zhang.neurons$cell.subtype[which(zhang.neurons$SCT_snn_res.1.1 == 9)] <- "4_AP"
+```
+
+# Data integration all cells
+```{r, message=FALSE}
+# Data preprocessing
+DefaultAssay(ludwig.cells) <- "integrated"
+ludwig.cells$cell.type <- ludwig.cells$cell.type
+ludwig.cells$data <- "ludwig"
+
+DefaultAssay(zhang.cells) <- "RNA"
+zhang.cells <- NormalizeData(object = zhang.cells, verbose = F)
+zhang.cells <- FindVariableFeatures(object = zhang.cells, selection.method = "vst", 
+                                                 nfeatures = 2000, verbose = F)
+zhang.cells$cell.type <- zhang.cells$renamed
+zhang.cells$data <- "zhang"
+
+
+# Integrate data
+cells.list <- list(ludwig.cells, zhang.cells)
+features <- SelectIntegrationFeatures(object.list = cells.list)
+cells.anchors <- FindIntegrationAnchors(object.list = cells.list,
+                                          anchor.features = features)
+cells.integrated <- IntegrateData(anchorset = cells.anchors)
+
+#  Scaling and dimensionality reduction
+cells.integrated <- ScaleData(object = cells.integrated, verbose = F) 
+cells.integrated <- RunPCA(object = cells.integrated, npcs = 30, verbose = F)
+cells.integrated <- RunUMAP(object = cells.integrated, reduction = "pca", 
+    dims = 1:10)
+
+```
+
+# Identify cell labels
+```{r}
+# Find clusters
+cells.integrated <- FindNeighbors(object = cells.integrated, reduction = "pca")
+cells.integrated <- FindClusters(object = cells.integrated, resolution = 0.1, verbose = F)
+
+DimPlot(cells.integrated, reduction = "umap", label = T, group.by = "integrated_snn_res.0.1") + 
+  xlab("UMAP 1") + ylab("UMAP 2")
+```
+
+```{r}
+# Assign labels based on the classifications from Ludwig et al.
+cells.integrated$cell.type2 <- ""
+cells.integrated$cell.type2[which(cells.integrated$integrated_snn_res.0.1 %in% c(0, 2, 3, 5, 6, 7, 8, 9, 16))] <- "Neurons"
+cells.integrated$cell.type2[which(cells.integrated$integrated_snn_res.0.1 == 1)] <- "Astrocytes"
+cells.integrated$cell.type2[which(cells.integrated$integrated_snn_res.0.1 == 4)] <- "Oligodendrocytes"
+cells.integrated$cell.type2[which(cells.integrated$integrated_snn_res.0.1 == 10)] <- "Tanycyte-like cells"
+cells.integrated$cell.type2[which(cells.integrated$integrated_snn_res.0.1 == 11)] <- "Ependymal cells"
+cells.integrated$cell.type2[which(cells.integrated$integrated_snn_res.0.1 == 12)] <- "OPCs"
+cells.integrated$cell.type2[which(cells.integrated$integrated_snn_res.0.1 == 13)] <- "Endothelial cells"
+cells.integrated$cell.type2[which(cells.integrated$integrated_snn_res.0.1 == 14)] <- "VLMCs"
+cells.integrated$cell.type2[which(cells.integrated$integrated_snn_res.0.1 == 15)] <- "Microglia"
+
+cells.integrated$cell.type2 <- factor(cells.integrated$cell.type2, levels = sort(unique(cells.integrated$cell.type2)))
+
+DimPlot(cells.integrated, reduction = "umap", label = T, group.by = "cell.type2") + 
+  xlab("UMAP 1") + ylab("UMAP 2")
+```
+
+# Data integration neurons
+```{r, message=FALSE}
+# Data preprocessing
+DefaultAssay(ludwig.neurons) <- "integrated"
+ludwig.neurons$neuronal.subtype <- ludwig.neurons$cell.subtype2
+ludwig.neurons$data <- "ludwig"
+
+DefaultAssay(zhang.neurons) <- "RNA"
+zhang.neurons <- NormalizeData(object = zhang.neurons, verbose = F)
+zhang.neurons <- FindVariableFeatures(object = zhang.neurons, selection.method = "vst", 
+                                                 nfeatures = 2000, verbose = F)
+zhang.neurons$neuronal.subtype <- zhang.neurons$cell.subtype
+zhang.neurons$data <- "zhang"
+
+# Integrate data
+neurons.list <- list(ludwig.neurons, zhang.neurons)
+features <- SelectIntegrationFeatures(object.list = neurons.list)
+neurons.anchors <- FindIntegrationAnchors(object.list = neurons.list,
+                                          anchor.features = features)
+neurons.integrated <- IntegrateData(anchorset = neurons.anchors)
+
+# Scaling and dimensionality reducion
+neurons.integrated <- ScaleData(object = neurons.integrated, verbose = F) 
+neurons.integrated <- RunPCA(object = neurons.integrated, npcs = 30, verbose = F)
+neurons.integrated <- RunUMAP(object = neurons.integrated, reduction = "pca", 
+    dims = 1:10)
+```
+
+# Identify neuron labels
+```{r}
+# Cluster the data at different granularities
+neurons.integrated <- FindNeighbors(object = neurons.integrated, reduction = "pca")
+neurons.integrated <- FindClusters(object = neurons.integrated, resolution = 0.1, verbose = F)
+neurons.integrated <- FindClusters(object = neurons.integrated, resolution = 1, verbose = F)
+
+DimPlot(neurons.integrated, reduction = "umap", label = T, group.by = "integrated_snn_res.0.1") + 
+  xlab("UMAP 1") + ylab("UMAP 2")
+```
+
+```{r}
+DimPlot(neurons.integrated, reduction = "umap", label = T, group.by = "integrated_snn_res.1") + 
+  xlab("UMAP 1") + ylab("UMAP 2")
+```
+
+```{r}
+# Assign labels based on the classifications from Ludwig et al. with the exception that the Glu4 population is split into three subpopulations
+
+neurons.integrated$neuronal.subtype2 <- "remove"
+
+# Cholinergic neurons
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 %in% c(6, 26))] <- "Chat1"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.0.1 == 8)] <- "Chat2"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 %in% c(11, 33))] <- "Chat3"
+
+# GABAergic neurons
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 %in% c(0, 4, 27, 38))] <- "GABA1"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.0.1 == 5)] <- "GABA2"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 %in% c(3, 14))] <- "GABA3"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 == 5)] <- "GABA4"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 %in% c(8,15))] <- "GABA5"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 == 25)] <- "GABA6"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 == 37)] <- "GABA7"
+
+# Glutamatergic neurons
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 %in% c(10, 17, 30))] <- "Glu1"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 %in% c(9, 19))] <- "Glu2"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 %in% c(22, 23))] <- "Glu3"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 == 16)] <- "Glu4a"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 == 28)] <- "Glu4b"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 == 31)] <- "Glu4c"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.0.1 == 9)] <- "Glu5"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 %in% c(24, 29))] <- "Glu6"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 == 12)] <- "Glu7"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 == 18)] <- "Glu8"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 == 21)] <- "Glu9"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 == 20)] <- "Glu10"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 == 32)] <- "Glu11"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.0.1 == 10)] <- "Glu12"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 == 35)] <- "Glu13"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 == 36)] <- "Glu14"
+neurons.integrated$neuronal.subtype2[which(neurons.integrated$integrated_snn_res.1 == 39)] <- "Glu15"
+
+neurons.integrated <- subset(neurons.integrated, subset = neuronal.subtype2 == "remove", invert = T)
+
+neurons.integrated$neuronal.subtype2 <- factor(neurons.integrated$neuronal.subtype2, 
+                                              levels = c(paste0("Chat", 1:3),
+                                                         paste0("GABA", 1:7),
+                                                         paste0("Glu", 1:3),
+                                                         paste0("Glu4", c("a","b","c")),
+                                                         paste0("Glu", 5:15)))
+
+DimPlot(neurons.integrated, reduction = "umap", label = T, group.by = "neuronal.subtype2") + 
+  xlab("UMAP 1") + ylab("UMAP 2")
+```
+
+# Save
+```{r}
+saveRDS(cells.integrated, 
+        file = "/projects/mludwig/Ludwig-Diabetes-2021/output/Seurat_objs/cells_integrated_Seurat_obj.rds")
+saveRDS(neurons.integrated, 
+        file = "/projects/mludwig/Ludwig-Diabetes-2021/output/Seurat_objs/neurons_integrated_Seurat_obj.rds")
+```
