@@ -10,10 +10,14 @@ To assign cell type and neuronal population labels, the two integrated data sets
 **Expression specificity**\
 The CELLEX (“CELL type EXpression-specificity”) tool (4) version 1.2.1 was used to compute gene expression specificity scores for the cell populations. We computed CELLEX scores for the atlases by Zhang et al. and Ludwig et al. separately and calculated combined expression specificity values using the mean of the two CELLEX scores. For cell populations that were only detected in the atlas by Ludwig et al., the expression specificity scores were based on the CELLEX values from this atlas alone. To identify cell population-specific receptors, we intersected the top 100 most specifically expressed genes in each cell population with receptors identified in the manually curated database CellTalkDB (5) of mouse receptors-ligand pairs.
 
+**Enriched motifs**\
+The position weight matrices for enriched motifs were identified using the 8th release (2020) of the JASPAR database (6).  
+
 ## References
 1. Zhang C, Kaye JA, Cai Z, Wang Y, Prescott SL, Liberles SD. Area Postrema Cell Types that Mediate Nausea-Associated Behaviors. Neuron. 2021 Feb 3;109(3):461-472.e5.
 2. Ludwig MQ, Cheng W, Gordian D, Lee J, Paulsen SJ, Hansen SN, et al. A genetic map of the mouse dorsal vagal complex and its role in obesity. Nat Metab. 2021 Mar 25;1–16.
 3. Stuart T, Butler A, Hoffman P, Hafemeister C, Papalexi E, Mauck WM, et al. Comprehensive Integration of Single-Cell Data. Cell. 2019 Jun 13;177(7):1888-1902.e21.
 4. Timshel PN, Thompson JJ, Pers TH. Genetic mapping of etiologic brain cell types for obesity. Loos R, Barkai N, editors. eLife. 2020 Sep 21;9:e55851.
-5. Shao X, Liao J, Li C, Lu X, Cheng J, Fan X. CellTalkDB: a manually curated database of ligand-receptor interactions in humans and mice. Brief Bioinform. 2020 Nov 4;
+5. Shao X, Liao J, Li C, Lu X, Cheng J, Fan X. CellTalkDB: a manually curated database of ligand-receptor interactions in humans and mice. Brief Bioinform. 2020 Nov 4.
+6. Fornes O, Castro-Mondragon JA, Khan A, van der Lee R, Zhang X, Richmond PA, et al. JASPAR 2020: update of the open-access database of transcription factor binding profiles. Nucleic Acids Res. 2020 Jan 8;48(D1):D87–92.
 
