@@ -1,0 +1,371 @@
+---
+title: "expression_specificity"
+output: html_notebook
+---
+
+```{r}
+library(Seurat)
+library(data.table)
+library(openxlsx)
+library(doMC)
+registerDoMC(20)
+```
+
+# Load data
+```{r}
+# Integrated daata
+cells.integrated <- readRDS("/projects/mludwig/Ludwig-Diabetes-2021/output/Seurat_objs/cells_integrated_Seurat_obj.rds")
+neurons.integrated <- readRDS("/projects/mludwig/Ludwig-Diabetes-2021/output/Seurat_objs/neurons_integrated_Seurat_obj.rds")
+```
+
+# Generate CELLEX input for all cells
+```{r}
+# Ludwig cells
+# Expression data
+cells.integrated.ludwig <- subset(cells.integrated, subset = data == "ludwig" & cell.type2 != "Neurons")
+expr.input <- as.data.frame(cells.integrated.ludwig@assays$RNA@counts)
+expr.input <- cbind(rownames(expr.input), expr.input) 
+colnames(expr.input)[1] <- "gene"
+
+# Meta data 
+meta.input <- cells.integrated.ludwig@meta.data[, "cell.type2", drop = F]
+colnames(meta.input) <- "cell_type"
+meta.input$cell_type <- gsub(" |-", "\\.", meta.input$cell_type)
+
+# Save 
+fwrite(expr.input, 
+       file = "/projects/mludwig/genetics/CELLECT/data/CELLEX_input/DVC_cells_Ludwig_counts.csv.gz",
+       row.names = F, nThread = 10, compress = "gzip")
+
+write.csv(meta.input, 
+          file = paste0("/projects/mludwig/genetics/CELLECT/data/CELLEX_input",
+                        "/DVC_cells_Ludwig_annotations.csv"))
+
+
+# Zhang cells
+# Expression data
+cells.integrated.zhang <- subset(cells.integrated, subset = data == "zhang" & cell.type2 != "Neurons")
+# Only compute CELLEX scores for cell types observed in >= 50 cells
+celltype.keep <- names(table(cells.integrated.zhang$cell.type2))[table(cells.integrated.zhang$cell.type2) >= 50]
+cells.integrated.zhang <- subset(cells.integrated.zhang, subset = cell.type2 %in% celltype.keep)
+#idx <- which(cells.integrated.zhang$cell.type2 == "Astrocytes")
+
+#cells.integrated.zhang <- subset(cells.integrated.zhang, cells = colnames(cells.integrated.zhang)[idx[400:500]], invert = T)
+
+expr.input <- as.data.frame(cells.integrated.zhang@assays$RNA@counts)
+#expr.input <- expr.input[-grep("ENSMUS", rownames(expr.input)),]
+expr.input <- cbind(rownames(expr.input), expr.input) 
+colnames(expr.input)[1] <- "gene"
+
+# Meta data 
+meta.input <- cells.integrated.zhang@meta.data[, "cell.type2", drop = F]
+colnames(meta.input) <- "cell_type"
+meta.input$cell_type <- gsub(" |-", "\\.", meta.input$cell_type)
+
+# Save 
+fwrite(expr.input, 
+       file = "/projects/mludwig/genetics/CELLECT/data/CELLEX_input/DVC_cells_Zhang_counts.csv.gz",
+       row.names = F, nThread = 10, compress = "gzip")
+
+write.csv(meta.input, 
+          file = paste0("/projects/mludwig/genetics/CELLECT/data/CELLEX_input",
+                        "/DVC_cells_Zhang_annotations.csv"))
+```
+
+# Generate CELLEX input for neurons
+```{r}
+# Ludwig neurons
+# Expression data
+neurons.integrated.ludwig <- subset(neurons.integrated, subset = data == "ludwig")
+expr.input <- as.data.frame(neurons.integrated.ludwig@assays$RNA@counts)
+expr.input <- cbind(rownames(expr.input), expr.input) 
+colnames(expr.input)[1] <- "gene"
+
+# Meta data 
+meta.input <- neurons.integrated.ludwig@meta.data[, "neuronal.subtype2", drop = F]
+colnames(meta.input) <- "cell_type"
+meta.input$cell_type <- gsub(" |-", "\\.", meta.input$cell_type)
+
+# Save 
+fwrite(expr.input, 
+       file = "/projects/mludwig/genetics/CELLECT/data/CELLEX_input/DVC_neurons_Ludwig_counts.csv.gz",
+       row.names = F, nThread = 10, compress = "gzip")
+
+write.csv(meta.input, 
+          file = paste0("/projects/mludwig/genetics/CELLECT/data/CELLEX_input",
+                        "/DVC_neurons_Ludwig_annotations.csv"))
+
+
+# Zhang neurons
+# Expression data
+neurons.integrated.zhang <- subset(neurons.integrated, subset = data == "zhang")
+# Only compute CELLEX scores for cell populations observed in >= 50 neurons
+subtype.keep <- names(table(neurons.integrated.zhang$neuronal.subtype2))[table(neurons.integrated.zhang$neuronal.subtype2) >= 50]
+neurons.integrated.zhang <- subset(neurons.integrated.zhang, subset = neuronal.subtype2 %in% subtype.keep)
+
+expr.input <- as.data.frame(neurons.integrated.zhang@assays$RNA@counts)
+#expr.input <- expr.input[-grep("ENSMUS", rownames(expr.input)),]
+expr.input <- cbind(rownames(expr.input), expr.input) 
+colnames(expr.input)[1] <- "gene"
+
+# Meta data 
+meta.input <- neurons.integrated.zhang@meta.data[, "neuronal.subtype2", drop = F]
+colnames(meta.input) <- "cell_type"
+meta.input$cell_type <- gsub(" |-", "\\.", meta.input$cell_type)
+
+# Save 
+fwrite(expr.input, 
+       file = "/projects/mludwig/genetics/CELLECT/data/CELLEX_input/DVC_neurons_Zhang_counts.csv.gz",
+       row.names = F, nThread = 10, compress = "gzip")
+
+write.csv(meta.input, 
+          file = paste0("/projects/mludwig/genetics/CELLECT/data/CELLEX_input",
+                        "/DVC_neurons_Zhang_annotations.csv"))
+```
+
+# Compute combined CELLEX scores for all cells
+```{r}
+# Load cell CELLEX values from Zhang et al.
+cellex.cells.zhang <- read.table(gzfile(paste0("/projects/mludwig/genetics/CELLECT/data/ESmu/",
+                                   "DVC_cells_Zhang.esmu.csv.gz")), 
+                     header = T, sep = ",", row.names = 1)
+colnames(cellex.cells.zhang) <- gsub("\\.", " ", colnames(cellex.cells.zhang))
+colnames(cellex.cells.zhang) <- gsub("Tanycyte like", "Tanycyte-like", colnames(cellex.cells.zhang))
+
+
+# Load cell CELLEX values from Ludwig et al.
+cellex.cells.ludwig <- read.table(gzfile(paste0("/projects/mludwig/genetics/CELLECT/data/ESmu/",
+                                   "DVC_cells_Ludwig.esmu.csv.gz")), 
+                     header = T, sep = ",", row.names = 1)
+colnames(cellex.cells.ludwig) <- gsub("\\.", " ", colnames(cellex.cells.ludwig))
+colnames(cellex.cells.ludwig) <- gsub("Tanycyte like", "Tanycyte-like", colnames(cellex.cells.ludwig))
+
+
+genes.union <- union(rownames(cellex.cells.ludwig), rownames(cellex.cells.zhang))
+genes.zhang.only <- rownames(cellex.cells.zhang)[!(rownames(cellex.cells.zhang) %in% rownames(cellex.cells.ludwig))]
+genes.ludwig.only <- rownames(cellex.cells.ludwig)[!(rownames(cellex.cells.ludwig) %in% rownames(cellex.cells.zhang))]
+
+cellex.cells.zhang.tmp <- data.frame(matrix(0, nrow = length(genes.ludwig.only),
+                                              ncol = ncol(cellex.cells.zhang)))
+rownames(cellex.cells.zhang.tmp) <- genes.ludwig.only
+colnames(cellex.cells.zhang.tmp) <- colnames(cellex.cells.zhang)
+
+cellex.cells.zhang <- rbind(cellex.cells.zhang, 
+                            cellex.cells.zhang.tmp)
+cellex.cells.zhang <- cellex.cells.zhang[genes.union, ]
+
+rm(cellex.cells.zhang.tmp)
+
+cellex.cells.ludwig.tmp <- data.frame(matrix(0, nrow = length(genes.zhang.only),
+                                              ncol = ncol(cellex.cells.ludwig)))
+rownames(cellex.cells.ludwig.tmp) <- genes.zhang.only
+colnames(cellex.cells.ludwig.tmp) <- colnames(cellex.cells.ludwig)
+
+cellex.cells.ludwig <- rbind(cellex.cells.ludwig, 
+                             cellex.cells.ludwig.tmp)
+cellex.cells.ludwig <- cellex.cells.ludwig[genes.union, ]
+
+rm(cellex.cells.ludwig.tmp)
+
+
+# Cell populations detected i both data sets 
+celltype.in.both <- colnames(cellex.cells.zhang)
+
+# Take the mean of the CELLEX scores for cell populations detected in both data sets
+cellex.cells <- aggregate(rbind(cellex.cells.ludwig[, celltype.in.both], 
+                                cellex.cells.zhang[, celltype.in.both]),
+                            by = list(rep(genes.union, 2)), FUN = mean, na.rm = T)
+rownames(cellex.cells) <- cellex.cells$Group.1
+cellex.cells <- within(cellex.cells, rm("Group.1"))
+
+# Keep the CELLEX scores for cell populations only detected in Ludwig et al. 
+cellex.cells <- cbind(cellex.cells[genes.union, ], 
+                        cellex.cells.ludwig[genes.union, !(colnames(cellex.cells.ludwig) %in% celltype.in.both)])
+
+cellex.cells <- cellex.cells[, levels(cells.integrated$cell.type2)[-which(levels(cells.integrated$cell.type2) == "Neurons")]]
+
+```
+
+# Compute combined CELLEX scores for neurons
+```{r}
+# Load neuron CELLEX values from Zhang et al.
+cellex.neurons.zhang <- read.table(gzfile(paste0("/projects/mludwig/genetics/CELLECT/data/ESmu/",
+                                   "DVC_neurons_Zhang.esmu.csv.gz")), 
+                     header = T, sep = ",", row.names = 1)
+colnames(cellex.neurons.zhang) <- gsub("_", "", colnames(cellex.neurons.zhang))
+
+
+# Load cell CELLEX values from Ludwig et al.
+cellex.neurons.ludwig <- read.table(gzfile(paste0("/projects/mludwig/genetics/CELLECT/data/ESmu/",
+                                   "DVC_neurons_Ludwig.esmu.csv.gz")), 
+                     header = T, sep = ",", row.names = 1)
+colnames(cellex.neurons.ludwig) <- gsub("_", "", colnames(cellex.neurons.ludwig))
+
+
+# Cell populations detected i both data sets 
+subtype.in.both <- colnames(cellex.neurons.zhang)
+
+
+genes.union <- union(rownames(cellex.neurons.ludwig), rownames(cellex.neurons.zhang))
+genes.zhang.only <- rownames(cellex.neurons.zhang)[!(rownames(cellex.neurons.zhang) %in% rownames(cellex.neurons.ludwig))]
+genes.ludwig.only <- rownames(cellex.neurons.ludwig)[!(rownames(cellex.neurons.ludwig) %in% rownames(cellex.neurons.zhang))]
+
+cellex.neurons.zhang.tmp <- data.frame(matrix(0, nrow = length(genes.ludwig.only),
+                                              ncol = ncol(cellex.neurons.zhang)))
+rownames(cellex.neurons.zhang.tmp) <- genes.ludwig.only
+colnames(cellex.neurons.zhang.tmp) <- colnames(cellex.neurons.zhang)
+
+cellex.neurons.zhang <- rbind(cellex.neurons.zhang, 
+                              cellex.neurons.zhang.tmp)
+cellex.neurons.zhang <- cellex.neurons.zhang[genes.union, ]
+
+rm(cellex.neurons.zhang.tmp)
+
+cellex.neurons.ludwig.tmp <- data.frame(matrix(0, nrow = length(genes.zhang.only),
+                                              ncol = ncol(cellex.neurons.ludwig)))
+rownames(cellex.neurons.ludwig.tmp) <- genes.zhang.only
+colnames(cellex.neurons.ludwig.tmp) <- colnames(cellex.neurons.ludwig)
+
+cellex.neurons.ludwig <- rbind(cellex.neurons.ludwig, 
+                              cellex.neurons.ludwig.tmp)
+cellex.neurons.ludwig <- cellex.neurons.ludwig[genes.union, ]
+rm(cellex.neurons.ludwig.tmp)
+
+
+# Take the mean of the CELLEX scores for cell populations detected in both data sets
+cellex.neurons <- aggregate(rbind(cellex.neurons.ludwig[, subtype.in.both], 
+                                  cellex.neurons.zhang[, subtype.in.both]),
+                            by = list(rep(genes.union, 2)), FUN = mean, na.rm = T)
+rownames(cellex.neurons) <- cellex.neurons$Group.1
+cellex.neurons <- within(cellex.neurons, rm("Group.1"))
+
+# Keep the CELLEX scores for cell populations only detected in Ludwig et al. 
+cellex.neurons <- cbind(cellex.neurons[genes.union, ], 
+                        cellex.neurons.ludwig[genes.union, !(colnames(cellex.neurons.ludwig) %in% subtype.in.both)])
+
+cellex.neurons <- cellex.neurons[, levels(neurons.integrated$neuronal.subtype2)]
+
+```
+
+# Save
+```{r}
+saveRDS(cellex.cells, file = "/projects/mludwig/Ludwig-Diabetes-2021/output/expr_specificity/cellex_cells.rds")
+saveRDS(cellex.neurons, file = "/projects/mludwig/Ludwig-Diabetes-2021/output/expr_specificity/cellex_neurons.rds")
+```
+
+# Supplemetary table 1
+```{r}
+cellex.list.glial <- foreach(i = colnames(cellex.cells)) %dopar% { 
+  idx.genes <- which(cellex.cells[,i] != 0)
+  
+  idx.zhang <- which(cells.integrated$cell.type2 == i & cells.integrated$data == "zhang")
+  idx.ludwig <- which(cells.integrated$cell.type2 == i & cells.integrated$data == "ludwig")
+  
+  fraction.zhang <- fraction.ludwig <- c()
+  
+  
+  if (i %in% celltype.in.both) { 
+          cellex.i <- data.frame(gene = rownames(cellex.cells)[idx.genes],
+                         combined_expr_specificity = cellex.cells[idx.genes, i],
+                         cellex_score_zhang = cellex.cells.zhang[idx.genes, i],
+                         expr_proportion_zhang = "-",
+                         cellex_score_ludwig = cellex.cells.ludwig[idx.genes, i],
+                         expr_proportion_ludwig = "-")
+          
+           for (j in cellex.i$gene) {
+
+                counts.ludwig <- which(cells.integrated@assays$RNA@counts[j, idx.ludwig] != 0)
+                fraction.ludwig <- c(fraction.ludwig, length(counts.ludwig) / length(idx.ludwig) * 100)
+                
+                counts.zhang <- which(cells.integrated@assays$RNA@counts[j, idx.zhang] != 0)
+                fraction.zhang <- c(fraction.zhang, length(counts.zhang) / length(idx.zhang) * 100)
+           }
+          
+          cellex.i$expr_proportion_zhang <- fraction.zhang
+          cellex.i$expr_proportion_ludwig <- fraction.ludwig
+
+    }
+  
+  else {
+          cellex.i <- data.frame(gene = rownames(cellex.cells)[idx.genes],
+                                combined_expr_specificity = cellex.cells[idx.genes, i],
+                                cellex_score_zhang = "-",
+                                expr_proportion_zhang = "-",
+                                cellex_score_ludwig = cellex.cells.ludwig[idx.genes, i],
+                                expr_proportion_ludwig = "-")
+          
+          for (j in cellex.i$gene) {
+
+                counts.ludwig <- which(cells.integrated@assays$RNA@counts[j, idx.ludwig] != 0)
+                fraction.ludwig <- c(fraction.ludwig, length(counts.ludwig) / length(idx.ludwig) * 100)
+                }
+          cellex.i$expr_proportion_ludwig <- fraction.ludwig
+          
+          }
+
+  cellex.i <- cellex.i[order(cellex.i$combined_expr_specificity, decreasing = T), ]
+  cellex.i
+}
+```
+
+```{r}
+cellex.list.neurons <- foreach(i = colnames(cellex.neurons)) %dopar% { 
+  idx.genes <- which(cellex.neurons[,i] != 0)
+  
+  idx.zhang <- which(neurons.integrated$neuronal.subtype2 == i & neurons.integrated$data == "zhang")
+  idx.ludwig <- which(neurons.integrated$neuronal.subtype2 == i & neurons.integrated$data == "ludwig")
+  
+  fraction.zhang <- fraction.ludwig <- c()
+  
+  if (i %in% subtype.in.both) { 
+          cellex.i <- data.frame(gene = rownames(cellex.neurons)[idx.genes],
+                                 combined_expr_specificity = cellex.neurons[idx.genes, i],
+                                 cellex_score_zhang = cellex.neurons.zhang[idx.genes, i],
+                                 expr_proportion_zhang = "-",
+                                 cellex_score_ludwig = cellex.neurons.ludwig[idx.genes, i],
+                                 expr_proportion_ludwig = "-")
+          
+           for (j in cellex.i$gene) {
+
+                counts.ludwig <- which(neurons.integrated@assays$RNA@counts[j, idx.ludwig] != 0)
+                fraction.ludwig <- c(fraction.ludwig, length(counts.ludwig) / length(idx.ludwig) * 100)
+                
+                counts.zhang <- which(neurons.integrated@assays$RNA@counts[j, idx.zhang] != 0)
+                fraction.zhang <- c(fraction.zhang, length(counts.zhang) / length(idx.zhang) * 100)
+           }
+          
+          cellex.i$expr_proportion_zhang <- fraction.zhang
+          cellex.i$expr_proportion_ludwig <- fraction.ludwig
+
+    }
+  
+  else {
+          cellex.i <- data.frame(gene = rownames(cellex.neurons)[idx.genes],
+                                combined_expr_specificity = cellex.neurons[idx.genes, i],
+                                cellex_score_zhang = "-",
+                                expr_proportion_zhang = "-",
+                                cellex_score_ludwig = cellex.neurons.ludwig[idx.genes, i],
+                                expr_proportion_ludwig = "-")
+          
+          for (j in cellex.i$gene) {
+
+                counts.ludwig <- which(neurons.integrated@assays$RNA@counts[j, idx.ludwig] != 0)
+                fraction.ludwig <- c(fraction.ludwig, length(counts.ludwig) / length(idx.ludwig) * 100)
+                }
+          cellex.i$expr_proportion_ludwig <- fraction.ludwig
+          
+          }
+
+  cellex.i <- cellex.i[order(cellex.i$combined_expr_specificity, decreasing = T), ]
+  cellex.i
+}
+```
+
+```{r}
+cellex.list <- cellex.list.glial
+cellex.list[9:35] <- cellex.list.neurons
+names(cellex.list) <- c(gsub(" ", "_", colnames(cellex.cells)), colnames(cellex.neurons))
+
+write.xlsx(cellex.list, file = "/projects/mludwig/Ludwig-Diabetes-2021/output/tables/Supplementary_table1.xlsx",
+           rowNames = F)
+```
