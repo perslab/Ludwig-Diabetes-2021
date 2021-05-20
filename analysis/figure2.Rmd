@@ -1,0 +1,157 @@
+---
+title: "figure2"
+output: html_notebook
+---
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(ggrepel)
+library(ggpubr)
+library(ggsci)
+library(reshape2)
+library(cowplot)
+library(plotrix)
+```
+
+# Load data
+```{r}
+# Seurat objects
+ludwig.cells.peaks <- readRDS("/projects/mludwig/Ludwig-2021/output/Seurat_objects/AP_peaks_Seurat_obj.rds")
+ludwig.neurons.peaks <- readRDS("/projects/mludwig/Ludwig-2021/output/Seurat_objects/neurons_peaks_Seurat_obj.rds")
+
+# Meta data
+neuron.type.info <- readRDS("/projects/mludwig/Ludwig-2021/output/AUCell/neuron_type_info.rds")
+ludwig.neurons.peaks$cell.subtype2 <- neuron.type.info$cell.type2[match(ludwig.neurons.peaks$cell.subtype,
+                                                                 neuron.type.info$cell.type)]
+ludwig.neurons.peaks$cell.subtype2 <- factor(ludwig.neurons.peaks$cell.subtype2, 
+                                             levels = neuron.type.info$cell.type2
+                                             [which(neuron.type.info$cell.type2 %in%
+                                                      ludwig.neurons.peaks$cell.subtype2)])
+```
+
+# UMAP plot cells (peaks)
+```{r}
+umap.embed.cells <- as.data.frame(ludwig.cells.peaks@reductions$umap@cell.embeddings)
+umap.embed.cells$cell.type <- ludwig.cells.peaks$cell.type
+umap.embed.cells$cell.type <- factor(umap.embed.cells$cell.type, 
+                                     levels = sort(unique(umap.embed.cells$cell.type)))
+label <- data.frame(cell.type = levels(umap.embed.cells$cell.type))
+label <- umap.embed.cells %>% 
+  dplyr::group_by(cell.type) %>% 
+  dplyr::summarize(x = median(UMAP_1), y = median(UMAP_2)) 
+
+pal <- c("#e5dc70", "#915c37", "#809952", "#a8a876", "#9e6daa", "#80b75c", "#d1741d", "#e79445", "#4e9d78")
+
+
+# Plot data points and text separately 
+cells.chromatin.umap.plot <- ggplot(data = umap.embed.cells, mapping = aes(x = UMAP_1, y = UMAP_2, 
+                                                           colour = cell.type)) +
+  geom_point(size = 1, alpha = 0.5) +
+  theme_pubr() +
+  theme(axis.line = element_line(colour = "black", size = 0.4), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank(), 
+        panel.background = element_blank(), 
+        legend.position = "None",
+        axis.title = element_text(size=6, face="bold", colour = "transparent"),
+        axis.text = element_text(size=6, face="bold", colour = "transparent")) + 
+  xlab("UMAP 1") + ylab("UMAP 2") + 
+  scale_color_manual(values = pal) +
+  geom_text_repel(data = label, aes(label = cell.type, x=x, y=y), 
+                  size=2, fontface="bold", inherit.aes = F, colour = "transparent") 
+
+cells.chromatin.umap.plot.text <- ggplot(data = umap.embed.cells, mapping = aes(x = UMAP_1, y = UMAP_2, 
+                                                           colour = cell.type)) +
+  geom_point(size = 1, alpha = 0) +
+  theme_pubr() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank(), 
+        axis.line = element_blank(), 
+        axis.ticks = element_blank(),
+        panel.background = element_rect(fill = "transparent"), 
+        plot.background = element_rect(fill = "transparent"),
+        legend.background = element_rect(fill = "transparent"), 
+        legend.box.background = element_rect(fill = "transparent"),
+        legend.position = "none",
+        axis.title = element_text(size=6, face="bold"),
+        axis.text = element_text(size=6, face="bold")) +
+  xlab("UMAP 1") + ylab("UMAP 2") + 
+  scale_color_manual(values = pal) +
+  geom_text_repel(data = label, aes(label = cell.type, x=x, y=y), 
+                  size=2, fontface="bold", inherit.aes = F)
+
+ggsave("/projects/mludwig/Ludwig-Diabetes-2021/output/figures/figure2/all_cells_chromatin_UMAP.png", cells.chromatin.umap.plot, height = 75, width = 75,
+       units = "mm", dpi = 1500, bg = "transparent")
+
+ggsave("/projects/mludwig/Ludwig-Diabetes-2021/output/figures/figure2/all_cells_chromatin_UMAP_text.pdf", cells.chromatin.umap.plot.text, height = 75, width = 75,
+       units = "mm", dpi = 1500, bg = "transparent")
+```
+
+# UMAP plot neurons (peaks)
+```{r}
+umap.embed.neurons <- as.data.frame(ludwig.neurons.peaks@reductions$umap@cell.embeddings)
+umap.embed.neurons$cell.type <- ludwig.neurons.peaks$cell.subtype2
+
+label <- umap.embed.neurons %>% 
+  dplyr::group_by(cell.type) %>% 
+  dplyr::summarize(x = median(UMAP_1), y = median(UMAP_2)) 
+
+
+pal <- c("#ef8ce3", "#da5bcd", "#af4ead", "#45599c", "#5f6d9d", 
+         "#fd74ee", "#992846", "#e6475f", "#8e9cc9", "#37477f", 
+         "#899dce", "#243466", "#992846", "#a6baf5", "#8e9cc9",
+         "#abbeed", "#45599c", "#576daa", "#bc3b4d", "#2b4177", 
+         "#da5bcd", "#5f6d9d")
+
+# Plot data points and text separately 
+neurons.chromatin.umap.plot <- ggplot(data = umap.embed.neurons, mapping = aes(x = UMAP_1, y = UMAP_2, 
+                                                           colour = cell.type)) +
+  geom_point(size = 1, alpha = 0.5) +
+  theme_pubr() +
+  theme(axis.line = element_line(colour = "black", size = 0.4), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank(), 
+        panel.background = element_blank(), 
+        legend.position = "None",
+        axis.title = element_text(size=6, face="bold", colour = "transparent"),
+        axis.text = element_text(size=6, face="bold", colour = "transparent")) + 
+  xlab("UMAP 1") + ylab("UMAP 2") + 
+  scale_color_manual(values = pal) +
+  geom_text_repel(data = label, aes(label = cell.type, x=x, y=y), 
+                  size=2, fontface="bold", inherit.aes = F, colour = "transparent") 
+
+neurons.chromatin.umap.plot.text <- ggplot(data = umap.embed.neurons, 
+                                           mapping = aes(x = UMAP_1, y = UMAP_2, 
+                                                           colour = cell.type)) +
+  geom_point(size = 1, alpha = 0) +
+  theme_pubr() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank(), 
+        axis.line = element_blank(), 
+        axis.ticks = element_blank(),
+        panel.background = element_rect(fill = "transparent"), 
+        plot.background = element_rect(fill = "transparent"),
+        legend.background = element_rect(fill = "transparent"), 
+        legend.box.background = element_rect(fill = "transparent"),
+        legend.position = "none",
+        axis.title = element_text(size=6, face="bold"),
+        axis.text = element_text(size=6, face="bold")) +
+  xlab("UMAP 1") + ylab("UMAP 2") + 
+  scale_color_manual(values = pal) +
+  geom_text_repel(data = label, aes(label = cell.type, x=x, y=y), 
+                  size=2, fontface="bold", inherit.aes = F)
+
+ggsave("/projects/mludwig/Ludwig-Diabetes-2021/output/figures/figure2/all_neurons_chromatin_UMAP.png", 
+       neurons.chromatin.umap.plot, 
+       height = 75, width = 75,
+       units = "mm", dpi = 1500, bg = "transparent")
+
+ggsave("/projects/mludwig/Ludwig-Diabetes-2021/output/figures/figure2/all_neurons_chromatin_UMAP_text.pdf", 
+       neurons.chromatin.umap.plot.text, height = 75, width = 75,
+       units = "mm", dpi = 1500, bg = "transparent")
+```
