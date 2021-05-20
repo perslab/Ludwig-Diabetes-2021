@@ -1,0 +1,732 @@
+---
+title: "figure1"
+output: html_notebook
+---
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(ggrepel)
+library(ggpubr)
+library(ggsci)
+library(reshape2)
+library(cowplot)
+library(plotrix)
+```
+
+# Load data
+```{r}
+# Seurat objects
+cells.integrated <- readRDS("/projects/mludwig/Ludwig-Diabetes-2021/output/Seurat_objs/cells_integrated_Seurat_obj.rds")
+neurons.integrated <- readRDS("/projects/mludwig/Ludwig-Diabetes-2021/output/Seurat_objs/neurons_integrated_Seurat_obj.rds")
+
+# Receptor-ligand pairs
+receptors <- read.csv("/projects/mludwig/Ludwig-Diabetes-2021/data/receptor-ligand_pairs/mouse_lr_pair.txt",
+                      sep = "\t")
+receptors <- unique(receptors$receptor_gene_symbol)
+
+# Expression specificity scores
+cellex.cells <- readRDS("/projects/mludwig/Ludwig-Diabetes-2021/output/expr_specificity/cellex_cells.rds")
+cellex.neurons <- readRDS("/projects/mludwig/Ludwig-Diabetes-2021/output/expr_specificity/cellex_neurons.rds")
+
+```
+
+# UMAP plot cells
+```{r}
+umap.embed.cells <- as.data.frame(cells.integrated@reductions$umap@cell.embeddings)
+umap.embed.cells$cell.type <- cells.integrated$cell.type2
+
+label <- data.frame(cell.type = levels(umap.embed.cells$cell.type))
+label <- umap.embed.cells %>% 
+  dplyr::group_by(cell.type) %>% 
+  dplyr::summarize(x = median(UMAP_1), y = median(UMAP_2)) 
+
+pal <- c("#e5dc70", "#915c37", "#809952", "#a8a876", "#9e6daa", "#80b75c", "#d1741d", "#e79445", "#4e9d78")
+
+# Plot data points and text separately 
+cells.umap.plot <- ggplot(data = umap.embed.cells, mapping = aes(x = UMAP_1, y = UMAP_2, 
+                                                           colour = cell.type)) +
+  geom_point(size = 1, alpha = 0.5) +
+  theme_pubr() +
+  theme(axis.line = element_line(colour = "black", size = 0.4), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank(), 
+        panel.background = element_blank(), 
+        legend.position = "None",
+        axis.title = element_text(size=6, face="bold", colour = "transparent"),
+        axis.text = element_text(size=6, face="bold", colour = "transparent")) + 
+  xlab("UMAP 1") + ylab("UMAP 2") + 
+  scale_color_manual(values = pal) +
+  geom_text_repel(data = label, aes(label = cell.type, x=x, y=y), 
+                  size=2, fontface="bold", inherit.aes = F, colour = "transparent") 
+
+
+cells.umap.plot.text <- ggplot(data = umap.embed.cells, mapping = aes(x = UMAP_1, y = UMAP_2, 
+                                                           colour = cell.type)) +
+  geom_point(size = 1, alpha = 0) +
+  theme_pubr() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank(), 
+        axis.line = element_blank(), 
+        axis.ticks = element_blank(),
+        panel.background = element_rect(fill = "transparent"), 
+        plot.background = element_rect(fill = "transparent"),
+        legend.background = element_rect(fill = "transparent"), 
+        legend.box.background = element_rect(fill = "transparent"),
+        legend.position = "none",
+        axis.title = element_text(size=6, face="bold"),
+        axis.text = element_text(size=6, face="bold")) +
+  xlab("UMAP 1") + ylab("UMAP 2") + 
+  scale_color_manual(values = pal) +
+  geom_text_repel(data = label, aes(label = cell.type, x=x, y=y), 
+                  size=2, fontface="bold", inherit.aes = F)
+
+ggsave("/projects/mludwig/Ludwig-Diabetes-2021/output/figures/figure1/all_cells_UMAP.png", cells.umap.plot, height = 75, width = 75,
+       units = "mm", dpi = 1500, bg = "transparent")
+
+ggsave("/projects/mludwig/Ludwig-Diabetes-2021/output/figures/figure1/all_cells_UMAP_text.pdf", cells.umap.plot.text, height = 75, width = 75,
+       units = "mm", dpi = 1500, bg = "transparent")
+
+```
+
+# UMAP plot neurons
+```{r}
+umap.embed.neurons <- as.data.frame(neurons.integrated@reductions$umap@cell.embeddings)
+umap.embed.neurons$cell.type <- neurons.integrated$neuronal.subtype2
+label <- data.frame(cell.type = unique(umap.embed.neurons$cell.type))
+label <- umap.embed.neurons %>% 
+  dplyr::group_by(cell.type) %>% 
+  dplyr::summarize(x = median(UMAP_1), y = median(UMAP_2)) 
+
+
+pal <- c("#ef8ce3", "#da5bcd", "#af4ead", "#45599c", "#5f6d9d", "#fd74ee",
+         "#992846", "#e6475f", "#8e9cc9", "#a82957", "#37477f", "#899dce",
+         "#243466", "#992846", "#bf3a5d", "#a24265", "#a6baf5", "#8e9cc9",
+         "#abbeed", "#45599c", "#576daa", "#bc3b4d", "#2b4177", "#da5bcd",
+         "#5f6d9d", "#243466", "#96aeea")
+
+pal <- c("#ef8ce3", "#da5bcd", "#af4ead", "#45599c", "#5f6d9d", "#fd74ee",
+         "#992846", "#e6475f", "#8e9cc9", "#a82957", "#37477f", "#899dce",
+         "#243466", "#992846", "#d4335d", "#a24265", "#a6baf5", "#8e9cc9",
+         "#abbeed", "#45599c", "#576daa", "#bc3b4d", "#2b4177", "#da5bcd",
+         "#5f6d9d", "#243466", "#96aeea")
+
+# Plot data points and text separately 
+neurons.umap.plot <- ggplot(data = umap.embed.neurons, mapping = aes(x = UMAP_1, y = UMAP_2, 
+                                                           colour = cell.type)) +
+  geom_point(size = 1, alpha = 0.5) +
+  theme_pubr() +
+  theme(axis.line = element_line(colour = "black", size = 0.4), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank(), 
+        panel.background = element_blank(), 
+        legend.position = "None",
+        axis.title = element_text(size=6, face="bold", colour = "transparent"),
+        axis.text = element_text(size=6, face="bold", colour = "transparent")) + 
+  xlab("UMAP 1") + ylab("UMAP 2") + 
+  scale_color_manual(values = pal) +
+  geom_text_repel(data = label, aes(label = cell.type, x=x, y=y), 
+                  size=2, fontface="bold", inherit.aes = F, colour = "transparent") 
+
+neurons.umap.plot.text <- ggplot(data = umap.embed.neurons, mapping = aes(x = UMAP_1, y = UMAP_2, 
+                                                           colour = cell.type)) +
+  geom_point(size = 1, alpha = 0) +
+  theme_pubr() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank(), 
+        axis.line = element_blank(), 
+        axis.ticks = element_blank(),
+        panel.background = element_rect(fill = "transparent"), 
+        plot.background = element_rect(fill = "transparent"),
+        legend.background = element_rect(fill = "transparent"), 
+        legend.box.background = element_rect(fill = "transparent"),
+        legend.position = "none",
+        axis.title = element_text(size=6, face="bold"),
+        axis.text = element_text(size=6, face="bold")) +
+  xlab("UMAP 1") + ylab("UMAP 2") + 
+  scale_color_manual(values = pal) +
+  geom_text_repel(data = label, aes(label = cell.type, x=x, y=y), 
+                  size=2, fontface="bold", inherit.aes = F)
+
+ggsave("/projects/mludwig/Ludwig-Diabetes-2021/output/figures/figure1/neurons_UMAP.png", neurons.umap.plot, height = 75, width = 75,
+       units = "mm", dpi = 1500, bg = "transparent")
+
+ggsave("/projects/mludwig/Ludwig-Diabetes-2021/output/figures/figure1/neurons_UMAP_text.pdf", neurons.umap.plot.text, height = 75, width = 75,
+       units = "mm", dpi = 1500, bg = "transparent")
+```
+
+
+# Oligodendrocytes
+```{r}
+cell.type <- "Oligodendrocytes"
+genes <- intersect(rownames(cellex.cells)[order(cellex.cells$Oligodendrocytes, decreasing = T)][1:100],
+          receptors)
+genes <- genes[!(genes %in% c("Gipr"))]
+
+# Plot1
+data <- data.frame(cells.integrated@assays$RNA@data["Gipr",])
+colnames(data) <- "gene"
+data$cell.type <- "all"
+data$cell.type[which(cells.integrated$cell.type2 == cell.type)] <- cell.type
+print(max(data$gene))
+violin.plot1 <- ggplot(data, aes(x = cell.type, y = gene)) +
+  geom_violin(aes(fill = cell.type), size = 0.1, adjust = 5, scale = "width") +
+    theme_pubr(legend = "top") +
+    theme(panel.border = element_blank(), 
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black", size = 0.1),
+          axis.title.x = element_blank(),
+          axis.title.y = element_text(size=5, face="bold"),
+          axis.ticks.x = element_blank(),
+          plot.title = element_text(size=5, face="bold.italic", hjust = 0.5, angle = 45,
+                                    margin=margin(0,0,-4,0)),
+          axis.text.x = element_blank(),
+          axis.text.y = element_text(size=5, face="bold"),
+          legend.position = "none",
+          legend.key.height = unit(0.1, "cm"),
+          legend.key.width = unit(0.2, "cm"),
+          plot.margin = unit(c(0.3, 0, 0, 0), "cm")) +
+  scale_fill_manual(values = c("grey", "#80b75c")) + 
+  scale_y_continuous(limits = c(0,4.6), breaks = c(0,2,4)) + ylab("Count") +
+  ggtitle("Gipr")
+
+for (i in 1:length(genes)) {
+  gene <- genes[i]
+
+  data <- data.frame(cells.integrated@assays$RNA@data[gene,])
+  colnames(data) <- "gene"
+  data$cell.type <- "all"
+  data$cell.type[which(cells.integrated$cell.type2 == cell.type)] <- cell.type
+  print(max(data$gene))
+
+  violin.plot <- ggplot(data, aes(x = cell.type, y = gene)) +
+    geom_violin(aes(fill = cell.type), size = 0.1, adjust = 5, scale = "width") +
+      theme_pubr(legend = "top") +
+      theme(panel.border = element_blank(), 
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(), 
+            axis.line = element_line(colour = "black", size = 0.1),
+            axis.title = element_blank(),
+            axis.ticks = element_blank(),
+            plot.title = element_text(size=5, face="bold.italic", hjust = 0.5,  angle = 45,
+                                      margin=margin(0,0,-4,0)),
+            axis.text = element_blank(),
+            legend.position = "none",
+            legend.key.height = unit(0.1, "cm"),
+            legend.key.width = unit(0.2, "cm"),
+            plot.margin = unit(c(0.3, 0, 0, 0), "cm")) +
+    scale_fill_manual(values = c("grey", "#80b75c")) + 
+    scale_y_continuous(limits = c(0,4.6)) +
+    ggtitle(gene)
+  
+    assign(paste0("violin.plot", (i+1)), violin.plot)
+}
+
+oligo.receptors <- plot_grid(violin.plot1, violin.plot2, violin.plot3, 
+                             violin.plot4, violin.plot5,
+                         align = "h", ncol = 5, rel_widths = c(1.6, 1, 1, 1, 1))
+
+oligo.receptors
+
+# margin: top, right, bottom, and left
+
+ggsave("/projects/mludwig/Ludwig-Diabetes-2021/output/figures/figure1/oligodendrocytes_receptors.pdf", oligo.receptors, height = 32, width = 41,
+       units = "mm", dpi = 300, bg = "transparent")
+```
+
+# GABA5 genes
+```{r}
+cell.type <- "GABA5"
+genes <- intersect(rownames(cellex.neurons)[order(cellex.neurons$GABA5, decreasing = T)][1:100],
+          receptors)
+genes <- genes[!(genes %in% c("Gipr"))]
+
+idx <- which(rownames(cellex.neurons) %in% genes)
+genes <- rownames(cellex.neurons)[idx][order(cellex.neurons$GABA5[idx], 
+                                        decreasing = T)]
+
+
+# Plot1
+data <- data.frame(neurons.integrated@assays$RNA@data["Gipr",])
+colnames(data) <- "gene"
+data$cell.type <- "all"
+data$cell.type[which(neurons.integrated$neuronal.subtype2 == cell.type)] <- cell.type
+  print(max(data$gene))
+
+violin.plot1 <- ggplot(data, aes(x = cell.type, y = gene)) +
+  geom_violin(aes(fill = cell.type), size = 0.1, adjust = 5, scale = "width") +
+    theme_pubr(legend = "top") +
+    theme(panel.border = element_blank(), 
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black", size = 0.1),
+          axis.title.x = element_blank(),
+          axis.title.y = element_text(size=5, face="bold"),
+          axis.ticks.x = element_blank(),
+          plot.title = element_text(size=5, face="bold.italic", hjust = 0.5, angle = 45,
+                                    margin=margin(0,0,-4,0)),
+          axis.text.x = element_blank(),
+          axis.text.y = element_text(size=5, face="bold"),
+          legend.position = "none",
+          legend.key.height = unit(0.1, "cm"),
+          legend.key.width = unit(0.2, "cm"),
+          plot.margin = unit(c(0.3, 0, 0, 0), "cm")) +
+  scale_fill_manual(values = c("grey", "#e6475f")) + 
+  scale_y_continuous(limits = c(0,4.47), breaks = c(0,2,4)) + ylab("Count") +
+  ggtitle("Gipr")
+
+for (i in 1:length(genes)) {
+  gene <- genes[i]
+
+  data <- data.frame(neurons.integrated@assays$RNA@data[gene,])
+  colnames(data) <- "gene"
+  data$cell.type <- "all"
+  data$cell.type[which(neurons.integrated$neuronal.subtype2 == cell.type)] <- cell.type
+  print(max(data$gene))
+
+  violin.plot <- ggplot(data, aes(x = cell.type, y = gene)) +
+    geom_violin(aes(fill = cell.type), size = 0.1, adjust = 5, scale = "width") +
+      theme_pubr(legend = "top") +
+      theme(panel.border = element_blank(), 
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(), 
+            axis.line = element_line(colour = "black", size = 0.1),
+            axis.title = element_blank(),
+            axis.ticks = element_blank(),
+            plot.title = element_text(size=5, face="bold.italic", hjust = 0.5, angle = 45,
+                                      margin=margin(0,0,-4,0)),
+            axis.text = element_blank(),
+            legend.position = "none",
+            legend.key.height = unit(0.1, "cm"),
+            legend.key.width = unit(0.2, "cm"),
+            plot.margin = unit(c(0.3, 0, 0, 0), "cm")) +
+    scale_fill_manual(values = c("grey", "#e6475f")) + 
+    scale_y_continuous(limits = c(0,4.47)) +
+    ggtitle(gene)
+  
+    assign(paste0("violin.plot", (i+1)), violin.plot)
+}
+
+GABA5.receptors <- plot_grid(violin.plot1, violin.plot2, violin.plot3, violin.plot4,
+                             violin.plot5, violin.plot6, violin.plot7, violin.plot8,
+                             align = "h", ncol = 8, rel_widths = c(1.5, 1, 1, 1, 1, 1, 1, 1))
+
+GABA5.receptors
+ggsave("/projects/mludwig/Ludwig-Diabetes-2021/output/figures/figure1/GABA5_receptors.pdf", GABA5.receptors, height = 32, width = 68,
+       units = "mm", dpi = 300, bg = "transparent")
+```
+
+
+# Glu4a genes
+```{r}
+cell.type <- "Glu4a"
+genes <- intersect(rownames(cellex.neurons)[order(cellex.neurons$Glu4a, decreasing = T)][1:100],
+          receptors)
+genes <- genes[which(genes != "Glp1r")]
+
+
+idx <- which(rownames(cellex.neurons) %in% genes)
+genes <- rownames(cellex.neurons)[idx][order(cellex.neurons$Glu4a[idx], 
+                                        decreasing = T)]
+
+# Plot1
+data <- data.frame(neurons.integrated@assays$RNA@data["Glp1r",])
+colnames(data) <- "gene"
+data$cell.type <- "all"
+data$cell.type[which(neurons.integrated$neuronal.subtype2 == cell.type)] <- cell.type
+  print(max(data$gene))
+
+violin.plot1 <- ggplot(data, aes(x = cell.type, y = gene)) +
+  geom_violin(aes(fill = cell.type), size = 0.1, adjust = 5, scale = "width") +
+    theme_pubr(legend = "top") +
+    theme(panel.border = element_blank(), 
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black", size = 0.1),
+          axis.title.x = element_blank(),
+          axis.title.y = element_text(size=5, face="bold"),
+          axis.ticks.x = element_blank(),
+          plot.title = element_text(size=5, face="bold.italic", hjust = 0.5, angle = 45,
+                                    margin=margin(0,0,-4,0)),
+          axis.text.x = element_blank(),
+          axis.text.y = element_text(size=5, face="bold"),
+          legend.position = "none",
+          legend.key.height = unit(0.1, "cm"),
+          legend.key.width = unit(0.2, "cm"),
+          plot.margin = unit(c(0.3, 0, 0, 0), "cm")) +
+  scale_fill_manual(values = c("grey", "#992846")) + 
+  scale_y_continuous(limits = c(0,4.26), breaks = c(0,2,4)) + ylab("Count") +
+  ggtitle("Glp1r")
+
+for (i in 1:length(genes)) {
+  gene <- genes[i]
+
+  data <- data.frame(neurons.integrated@assays$RNA@data[gene,])
+  colnames(data) <- "gene"
+  data$cell.type <- "all"
+  data$cell.type[which(neurons.integrated$neuronal.subtype2 == cell.type)] <- cell.type
+  print(max(data$gene))
+
+  violin.plot <- ggplot(data, aes(x = cell.type, y = gene)) +
+    geom_violin(aes(fill = cell.type), size = 0.1, adjust = 5, scale = "width") +
+      theme_pubr(legend = "top") +
+      theme(panel.border = element_blank(), 
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(), 
+            axis.line = element_line(colour = "black", size = 0.1),
+            axis.title = element_blank(),
+            axis.ticks = element_blank(),
+            plot.title = element_text(size=5, face="bold.italic", hjust = 0.5, angle = 45,
+                                       margin=margin(0,0,-4,0)),
+            axis.text = element_blank(),
+            legend.position = "none",
+            legend.key.height = unit(0.1, "cm"),
+            legend.key.width = unit(0.2, "cm"),
+            plot.margin = unit(c(0.3, 0, 0, 0), "cm")) +
+    scale_fill_manual(values = c("grey", "#992846")) + 
+    scale_y_continuous(limits = c(0, 4.26)) +
+    ggtitle(gene)
+  
+    assign(paste0("violin.plot", (i+1)), violin.plot)
+}
+
+glu4a.receptors <- plot_grid(violin.plot1, violin.plot2, violin.plot3, violin.plot4, 
+                             violin.plot5, violin.plot6,
+                         align = "h", ncol = 6, rel_widths = c(1.5, 1, 1, 1, 1, 1))
+glu4a.receptors
+ggsave("/projects/mludwig/Ludwig-Diabetes-2021/output/figures/figure1/Glu4a_receptors.pdf", glu4a.receptors, height = 32, width = 59,
+       units = "mm", dpi = 300, bg = "transparent")
+```
+
+# Glu4b genes
+```{r}
+cell.type <- "Glu4b"
+genes <- intersect(rownames(cellex.neurons)[order(cellex.neurons$Glu4b, decreasing = T)][1:100],
+          receptors)
+genes <- genes[which(genes != "Glp1r")]
+idx <- which(rownames(cellex.neurons) %in% genes)
+genes <- rownames(cellex.neurons)[idx][order(cellex.neurons$Glu4b[idx], 
+                                        decreasing = T)]
+
+# Plot1
+data <- data.frame(neurons.integrated@assays$RNA@data["Glp1r",])
+colnames(data) <- "gene"
+data$cell.type <- "all"
+data$cell.type[which(neurons.integrated$neuronal.subtype2 == cell.type)] <- cell.type
+  print(max(data$gene))
+
+violin.plot1 <- ggplot(data, aes(x = cell.type, y = gene)) +
+  geom_violin(aes(fill = cell.type), size = 0.1, adjust = 5, scale = "width") +
+    theme_pubr(legend = "top") +
+    theme(panel.border = element_blank(), 
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black", size = 0.1),
+          axis.title.x = element_blank(),
+          axis.title.y = element_text(size=5, face="bold"),
+          axis.ticks.x = element_blank(),
+          plot.title = element_text(size=5, face="bold.italic", hjust = 0.5, angle = 45,
+                                    margin=margin(0,0,-4,0)),
+          axis.text.x = element_blank(),
+          axis.text.y = element_text(size=5, face="bold"),
+          legend.position = "none",
+          legend.key.height = unit(0.1, "cm"),
+          legend.key.width = unit(0.2, "cm"),
+          plot.margin = unit(c(0.3, 0, 0, 0), "cm")) +
+  scale_fill_manual(values = c("grey", "#d4335d")) + 
+  scale_y_continuous(limits = c(0,5.07), breaks = c(0,2,4)) + ylab("Count") +
+  ggtitle("Glp1r")
+
+for (i in 1:length(genes)) {
+  gene <- genes[i]
+
+  data <- data.frame(neurons.integrated@assays$RNA@data[gene,])
+  colnames(data) <- "gene"
+  data$cell.type <- "all"
+  data$cell.type[which(neurons.integrated$neuronal.subtype2 == cell.type)] <- cell.type
+  print(max(data$gene))
+
+  violin.plot <- ggplot(data, aes(x = cell.type, y = gene)) +
+    geom_violin(aes(fill = cell.type), size = 0.1, adjust = 5, scale = "width") +
+      theme_pubr(legend = "top") +
+      theme(panel.border = element_blank(), 
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(), 
+            axis.line = element_line(colour = "black", size = 0.1),
+            axis.title = element_blank(),
+            axis.ticks = element_blank(),
+            plot.title = element_text(size=5, face="bold.italic", hjust = 0.5, angle = 45,
+                                      margin=margin(0,0,-4,0)),
+            axis.text = element_blank(),
+            legend.position = "none",
+            legend.key.height = unit(0.1, "cm"),
+            legend.key.width = unit(0.2, "cm"),
+            plot.margin = unit(c(0.3, 0, 0, 0), "cm")) +
+    scale_fill_manual(values = c("grey", "#d4335d")) + 
+    scale_y_continuous(limits = c(0,5.07)) +
+    ggtitle(gene)
+  
+    assign(paste0("violin.plot", (i+1)), violin.plot)
+}
+
+glu4b.receptors <- plot_grid(violin.plot1, violin.plot2, violin.plot3, violin.plot4,
+                             violin.plot5, violin.plot6, violin.plot7, violin.plot8,
+                             violin.plot9, violin.plot10, violin.plot11, violin.plot12,
+                             align = "h", ncol = 12, rel_widths = c(1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1))
+
+glu4b.receptors
+ggsave("/projects/mludwig/Ludwig-Diabetes-2021/output/figures/figure1/Glu4b_receptors.pdf", glu4b.receptors, height = 32, width = 113,
+       units = "mm", dpi = 300, bg = "transparent")
+```
+
+# Glu4c genes
+```{r}
+cell.type <- "Glu4c"
+genes <- intersect(rownames(cellex.neurons)[order(cellex.neurons$Glu4c, decreasing = T)][1:100],
+          receptors)
+genes <- genes[which(genes != "Glp1r")]
+
+idx <- which(rownames(cellex.neurons) %in% genes)
+genes <- rownames(cellex.neurons)[idx][order(cellex.neurons$Glu4c[idx], 
+                                        decreasing = T)]
+
+# Plot1
+data <- data.frame(neurons.integrated@assays$RNA@data["Glp1r",])
+colnames(data) <- "gene"
+data$cell.type <- "all"
+data$cell.type[which(neurons.integrated$neuronal.subtype2 == cell.type)] <- cell.type
+  print(max(data$gene))
+
+violin.plot1 <- ggplot(data, aes(x = cell.type, y = gene)) +
+  geom_violin(aes(fill = cell.type), size = 0.1, adjust = 5, scale = "width") +
+    theme_pubr(legend = "top") +
+    theme(panel.border = element_blank(), 
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black", size = 0.1),
+          axis.title.x = element_blank(),
+          axis.title.y = element_text(size=5, face="bold"),
+          axis.ticks.x = element_blank(),
+          plot.title = element_text(size=5, face="bold.italic", hjust = 0.5, angle = 45,
+                                    margin=margin(0,0,-4,0)),
+          axis.text.x = element_blank(),
+          axis.text.y = element_text(size=5, face="bold"),
+          legend.position = "none",
+          legend.key.height = unit(0.1, "cm"),
+          legend.key.width = unit(0.2, "cm"),
+          plot.margin = unit(c(0.3, 0, 0, 0), "cm")) +
+  scale_fill_manual(values = c("grey", "#a24265")) + 
+  scale_y_continuous(limits = c(0,4.5), breaks = c(0,2,4)) + ylab("Count") +
+  ggtitle("Glp1r")
+
+for (i in 1:length(genes)) {
+  gene <- genes[i]
+
+  data <- data.frame(neurons.integrated@assays$RNA@data[gene,])
+  colnames(data) <- "gene"
+  data$cell.type <- "all"
+  data$cell.type[which(neurons.integrated$neuronal.subtype2 == cell.type)] <- cell.type
+  print(max(data$gene))
+
+  violin.plot <- ggplot(data, aes(x = cell.type, y = gene)) +
+    geom_violin(aes(fill = cell.type), size = 0.1, adjust = 5, scale = "width") +
+      theme_pubr(legend = "top") +
+      theme(panel.border = element_blank(), 
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(), 
+            axis.line = element_line(colour = "black", size = 0.1),
+            axis.title = element_blank(),
+            axis.ticks = element_blank(),
+            plot.title = element_text(size=5, face="bold.italic", hjust = 0.5, angle = 45,
+                                      margin=margin(0,0,-4,0)),
+            axis.text = element_blank(),
+            legend.position = "none",
+            legend.key.height = unit(0.1, "cm"),
+            legend.key.width = unit(0.2, "cm"),
+            plot.margin = unit(c(0.3, 0, 0, 0), "cm")) +
+    scale_fill_manual(values = c("grey", "#a24265")) + 
+    scale_y_continuous(limits = c(0,4.5)) +
+    ggtitle(gene)
+  
+    assign(paste0("violin.plot", (i+1)), violin.plot)
+}
+
+glu4c.receptors <- plot_grid(violin.plot1, violin.plot2, violin.plot3, violin.plot4,
+                             violin.plot5, violin.plot6, violin.plot7, violin.plot8,
+                             violin.plot9, violin.plot10,
+                             align = "h", ncol = 10, rel_widths = c(1.5, 1, 1, 1, 1, 1, 1, 1, 1, 1))
+
+glu4c.receptors
+ggsave("/projects/mludwig/Ludwig-Diabetes-2021/output/figures/figure1/Glu4c_receptors.pdf", glu4c.receptors, height = 32, width = 95,
+       units = "mm", dpi = 300, bg = "transparent")
+
+```
+
+# Glu11 genes
+```{r}
+cell.type <- "Glu11"
+genes <- intersect(rownames(cellex.neurons)[order(cellex.neurons$Glu11, decreasing = T)][1:100],
+          receptors)
+genes <- genes[which(genes != "Glp1r")]
+
+# Plot1
+data <- data.frame(neurons.integrated@assays$RNA@data["Glp1r",])
+colnames(data) <- "gene"
+data$cell.type <- "all"
+data$cell.type[which(neurons.integrated$neuronal.subtype2 == cell.type)] <- cell.type
+  print(max(data$gene))
+
+violin.plot1 <- ggplot(data, aes(x = cell.type, y = gene)) +
+  geom_violin(aes(fill = cell.type), size = 0.1, adjust = 5, scale = "width") +
+    theme_pubr(legend = "top") +
+    theme(panel.border = element_blank(), 
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black", size = 0.1),
+          axis.title.x = element_blank(),
+          axis.title.y = element_text(size=5, face="bold"),
+          axis.ticks.x = element_blank(),
+          plot.title = element_text(size=5, face="bold.italic", hjust = 0.5, angle = 45,
+                                    margin=margin(0,0,-4,0)),
+          axis.text.x = element_blank(),
+          axis.text.y = element_text(size=5, face="bold"),
+          legend.position = "none",
+          legend.key.height = unit(0.1, "cm"),
+          legend.key.width = unit(0.2, "cm"),
+          plot.margin = unit(c(0.3, 0, 0, 0), "cm")) +
+  scale_fill_manual(values = c("grey", "#24325F")) + 
+  scale_y_continuous(limits = c(0,4.01), breaks = c(0,2,4)) + ylab("Count") +
+  ggtitle("Glp1r")
+
+for (i in 1:length(genes)) {
+  gene <- genes[i]
+
+  data <- data.frame(neurons.integrated@assays$RNA@data[gene,])
+  colnames(data) <- "gene"
+  data$cell.type <- "all"
+  data$cell.type[which(neurons.integrated$neuronal.subtype2 == cell.type)] <- cell.type
+  print(max(data$gene))
+
+  violin.plot <- ggplot(data, aes(x = cell.type, y = gene)) +
+    geom_violin(aes(fill = cell.type), size = 0.1, adjust = 5, scale = "width") +
+      theme_pubr(legend = "top") +
+      theme(panel.border = element_blank(), 
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(), 
+            axis.line = element_line(colour = "black", size = 0.1),
+            axis.title = element_blank(),
+            axis.ticks = element_blank(),
+            plot.title = element_text(size=5, face="bold.italic", hjust = 0.5, angle = 45,
+                                      margin=margin(0,0,-4,0)),
+            axis.text = element_blank(),
+            legend.position = "none",
+            legend.key.height = unit(0.1, "cm"),
+            legend.key.width = unit(0.2, "cm"),
+            plot.margin = unit(c(0.3, 0, 0, 0), "cm")) +
+    scale_fill_manual(values = c("grey", "#24325F")) + 
+    scale_y_continuous(limits = c(0,4.01)) +
+    ggtitle(gene)
+  
+    assign(paste0("violin.plot", (i+1)), violin.plot)
+}
+
+glu11.receptors <- plot_grid(violin.plot1, violin.plot2, 
+                         violin.plot3, violin.plot4,
+                         violin.plot5, violin.plot6, violin.plot7,
+                         violin.plot8,
+                         align = "h", ncol = 8, rel_widths = c(1.5, 1, 1, 1, 1, 1, 1, 1))
+
+glu11.receptors
+
+
+ggsave("/projects/mludwig/Ludwig-Diabetes-2021/output/figures/figure1/Glu11_receptors.pdf", glu11.receptors, height = 32, width = 77,
+       units = "mm", dpi = 300, bg = "transparent")
+
+```
+
+# GABA7
+```{r}
+cell.type <- "GABA7"
+genes <- intersect(rownames(cellex.neurons)[order(cellex.neurons$GABA7, decreasing = T)][1:100],
+          receptors)
+genes <- genes[!(genes %in% c("Glp1r"))]
+
+idx <- which(rownames(cellex.neurons) %in% genes)
+genes <- rownames(cellex.neurons)[idx][order(cellex.neurons$GABA7[idx], 
+                                        decreasing = T)]
+
+
+# Plot1
+data <- data.frame(neurons.integrated@assays$RNA@data["Glp1r",])
+colnames(data) <- "gene"
+data$cell.type <- "all"
+data$cell.type[which(neurons.integrated$neuronal.subtype2 == cell.type)] <- cell.type
+  print(max(data$gene))
+
+violin.plot1 <- ggplot(data, aes(x = cell.type, y = gene)) +
+  geom_violin(aes(fill = cell.type), size = 0.1, adjust = 5, scale = "width") +
+    theme_pubr(legend = "top") +
+    theme(panel.border = element_blank(), 
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black", size = 0.1),
+          axis.title.x = element_blank(),
+          axis.title.y = element_text(size=5, face="bold"),
+          axis.ticks.x = element_blank(),
+          plot.title = element_text(size=5, face="bold.italic", hjust = 0.5, angle = 45,
+                                    margin=margin(0,0,-4,0)),
+          axis.text.x = element_blank(),
+          axis.text.y = element_text(size=5, face="bold"),
+          legend.position = "none",
+          legend.key.height = unit(0.1, "cm"),
+          legend.key.width = unit(0.2, "cm"),
+          plot.margin = unit(c(0.3, 0, 0, 0), "cm")) +
+  scale_fill_manual(values = c("grey", "#a82957")) + 
+  scale_y_continuous(limits = c(0,4.01), breaks = c(0,2,4)) + ylab("Count") +
+  ggtitle("Glp1r")
+
+for (i in 1:length(genes)) {
+  gene <- genes[i]
+
+  data <- data.frame(neurons.integrated@assays$RNA@data[gene,])
+  colnames(data) <- "gene"
+  data$cell.type <- "all"
+  data$cell.type[which(neurons.integrated$neuronal.subtype2 == cell.type)] <- cell.type
+  print(max(data$gene))
+
+  violin.plot <- ggplot(data, aes(x = cell.type, y = gene)) +
+    geom_violin(aes(fill = cell.type), size = 0.1, adjust = 5, scale = "width") +
+      theme_pubr(legend = "top") +
+      theme(panel.border = element_blank(), 
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(), 
+            axis.line = element_line(colour = "black", size = 0.1),
+            axis.title = element_blank(),
+            axis.ticks = element_blank(),
+            plot.title = element_text(size=5, face="bold.italic", hjust = 0.5, angle = 45,
+                                      margin=margin(0,0,-4,0)),
+            axis.text = element_blank(),
+            legend.position = "none",
+            legend.key.height = unit(0.1, "cm"),
+            legend.key.width = unit(0.2, "cm"),
+            plot.margin = unit(c(0.3, 0, 0, 0), "cm")) +
+    scale_fill_manual(values = c("grey", "#a82957")) + 
+    scale_y_continuous(limits = c(0,4.01)) +
+    ggtitle(gene)
+  
+    assign(paste0("violin.plot", (i+1)), violin.plot)
+}
+
+GABA7.receptors <- plot_grid(violin.plot1, violin.plot2, violin.plot3, violin.plot4,
+                             align = "h", ncol = 4, rel_widths = c(1.5, 1, 1, 1))
+GABA7.receptors
+
+ggsave("/projects/mludwig/Ludwig-Diabetes-2021/output/figures/figure1/GABA7_receceptors.pdf", GABA7.receptors, height = 32, width = 41,
+       units = "mm", dpi = 300, bg = "transparent")
+```
+
